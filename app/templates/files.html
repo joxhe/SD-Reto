@@ -1,36 +1,70 @@
 {% extends "layout.html" %}
 
-{% block title %}Archivos{% endblock %}
+{% block title %}Archivos - Sistema Distribuido{% endblock %}
 
 {% block content %}
-<h1>Gestión de Archivos</h1>
+<h1>🌐 Sistema de Archivos Distribuido</h1>
+<p><strong>Gateway:</strong> {{ node_info.id }} | <strong>Nodos Storage:</strong> {{ node_info.storage_nodes|length }}</p>
 
 {% if session.user_id %}
-    <h2>Subir Archivo</h2>
+    <h2>📤 Subir Archivo</h2>
     <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
         <p>
             <label>Seleccionar archivo: 
                 <input type="file" name="file" required>
             </label>
         </p>
-        <button type="submit">Subir Archivo</button>
+        <button type="submit">Subir y Replicar</button>
+        <small>Se replicará automáticamente en 3 nodos</small>
     </form>
     
     <hr>
     
-    <h2>Lista de Archivos</h2>
+    <h2>📋 Archivos Distribuidos</h2>
     {% if files %}
         <table border="1" style="border-collapse: collapse; width: 100%;">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Nombre del Archivo</th>
-                    <th>Subido por (ID)</th>
-                    <th>Fecha de Subida</th>
+                    <th>Archivo</th>
+                    <th>Subido por</th>
+                    <th>Fecha</th>
+                    <th>Hash</th>
+                    <th>Tamaño</th>
+                    <th>Nodos</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
                 {% for file in files %}
+                <tr>
+                    <td><strong>{{ file[1] }}</strong></td>
+                    <td>{{ file[2] }}</td>
+                    <td>{{ file[3] }}</td>
+                    <td><code>{{ file[4][:8] }}...</code></td>
+                    <td>{{ "%.1f"|format(file[5]/1024) }} KB</td>
+                    <td>{{ file[6].split(',')|length }} réplicas</td>
+                    <td>
+                        <a href="{{ url_for('download_file', file_id=file[0]) }}" 
+                           style="background: #007bff; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">
+                           📥 Descargar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No hay archivos en el sistema distribuido aún.</p>
+    {% endif %}
+    
+    <hr>
+    <h3>ℹ️ Estado de Nodos</h3>
+    <p><strong>Nodos de almacenamiento activos:</strong> {{ node_info.storage_nodes|join(', ') }}</p>
+    
+{% else %}
+    <p>Debes <a href="{{ url_for('login') }}">iniciar sesión</a> para acceder al sistema distribuido.</p>
+{% endif %}
+{% endblock %} in files %}
                 <tr>
                     <td>{{ file[0] }}</td>
                     <td>{{ file[1] }}</td>

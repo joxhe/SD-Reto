@@ -1,34 +1,143 @@
 services:
-  db:
+  # Base de datos centralizada
+  mysql_main:
     image: mysql:8.0
-    container_name: mysql_reto
+    container_name: mysql_distributed
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: cecar
       MYSQL_DATABASE: reto_db
-    command: --default-authentication-plugin=mysql_native_password
+      MYSQL_ROOT_HOST: '%'
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --bind-address=0.0.0.0
+      --skip-host-cache
+      --skip-name-resolve
     ports:
-      - "3307:3306"
+      - "3307:3306"  # Solo para debug externo
     volumes:
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - mysql_data:/var/lib/mysql
+      - ./db/init_distributed.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_distributed_data:/var/lib/mysql
     networks:
-      - app-network
+      - distributed-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pcecar"]
+      timeout: 10s
+      retries: 5
+      interval: 10s
+      start_period: 30s
 
-  web:
+  # Gateway/Load Balancer (Punto de entrada principal)
+  gateway:
     build: ./app
-    container_name: flask_reto
+    container_name: gateway_node
     restart: always
     ports:
-      - "5000:5000"
-    depends_on:
-      - db
+      - "5000:5000"  # Puerto principal para usuarios
+    environment:
+      - NODE_TYPE=gateway
+      - NODE_ID=gateway
+      - DB_HOST=mysql_main
+      - DB_USER=root
+      - DB_PASSWORD=cecar
+      - DB_NAME=reto_db
+      - DB_PORT=3306
+      - STORAGE_NODES=storage_node1:5000,storage_node2:5000,storage_node3:5000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - gateway_temp:/tmp/gateway
     networks:
-      - app-network
+      - distributed-net
+    depends_on:
+      mysql_main:
+        condition: service_healthy
+
+  # Nodo de almacenamiento 1
+  storage_node1:
+    build: ./app
+    container_name: storage_node1
+    restart: always
+    ports:
+      - "5001:5000"  # Puerto para comunicación entre nodos
+    environment:
+      - NODE_TYPE=storage
+      - NODE_ID=node1
+      - DB_HOST=mysql_main
+      - DB_USER=root
+      - DB_PASSWORD=cecar
+      - DB_NAME=reto_db
+      - DB_PORT=3306
+      - STORAGE_PATH=/storage/node1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - node1_storage:/storage/node1
+    networks:
+      - distributed-net
+    depends_on:
+      mysql_main:
+        condition: service_healthy
+
+  # Nodo de almacenamiento 2  
+  storage_node2:
+    build: ./app
+    container_name: storage_node2
+    restart: always
+    ports:
+      - "5002:5000"
+    environment:
+      - NODE_TYPE=storage
+      - NODE_ID=node2
+      - DB_HOST=mysql_main
+      - DB_USER=root
+      - DB_PASSWORD=cecar
+      - DB_NAME=reto_db
+      - DB_PORT=3306
+      - STORAGE_PATH=/storage/node2
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - node2_storage:/storage/node2
+    networks:
+      - distributed-net
+    depends_on:
+      mysql_main:
+        condition: service_healthy
+
+  # Nodo de almacenamiento 3
+  storage_node3:
+    build: ./app
+    container_name: storage_node3
+    restart: always
+    ports:
+      - "5003:5000"
+    environment:
+      - NODE_TYPE=storage
+      - NODE_ID=node3
+      - DB_HOST=mysql_main
+      - DB_USER=root
+      - DB_PASSWORD=cecar
+      - DB_NAME=reto_db
+      - DB_PORT=3306
+      - STORAGE_PATH=/storage/node3
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - node3_storage:/storage/node3
+    networks:
+      - distributed-net
+    depends_on:
+      mysql_main:
+        condition: service_healthy
 
 volumes:
-  mysql_data:
+  mysql_distributed_data:
+  gateway_temp:
+  node1_storage:
+  node2_storage:
+  node3_storage:
 
 networks:
-  app-network:
+  distributed-net:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
