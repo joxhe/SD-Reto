@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+
+{% block title %}Archivos{% endblock %}
+
+{% block content %}
+<h1>Gestión de Archivos</h1>
+
+{% if session.user_id %}
+    <h2>Subir Archivo</h2>
+    <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+        <p>
+            <label>Seleccionar archivo: 
+                <input type="file" name="file" required>
+            </label>
+        </p>
+        <button type="submit">Subir Archivo</button>
+    </form>
+    
+    <hr>
+    
+    <h2>Lista de Archivos</h2>
+    {% if files %}
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre del Archivo</th>
+                    <th>Subido por (ID)</th>
+                    <th>Fecha de Subida</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                <tr>
+                    <td>{{ file[0] }}</td>
+                    <td>{{ file[1] }}</td>
+                    <td>{{ file[2] }}</td>
+                    <td>{{ file[3] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No hay archivos subidos aún.</p>
+    {% endif %}
+{% else %}
+    <p>Debes <a href="{{ url_for('login') }}">iniciar sesión</a> para ver y subir archivos.</p>
+{% endif %}
+{% endblock %}
